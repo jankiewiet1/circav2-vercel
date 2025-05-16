@@ -1,8 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
+const supabaseUrl = typeof window !== 'undefined' 
+  ? process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co'
+  : 'https://example.supabase.co';
+const supabaseAnonKey = typeof window !== 'undefined'
+  ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder'
+  : 'placeholder';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Types
