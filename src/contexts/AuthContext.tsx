@@ -3,6 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { Profile, UserWithProfile } from '../types';
 import { useToast } from '@/hooks/use-toast';
+import { sendSignUpConfirmationEmail } from '@/services/emailService';
 
 interface AuthContextType {
   user: UserWithProfile | null;
@@ -183,6 +184,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (profileError) {
         console.error("Profile creation error:", profileError);
+      }
+      
+      // Step 3: Send welcome email
+      try {
+        await sendSignUpConfirmationEmail({
+          email: email,
+          name: `${firstName} ${lastName}`,
+          company: '',
+          phone: ''
+        });
+        console.log('Signup confirmation email sent to:', email);
+      } catch (emailError) {
+        console.error('Failed to send signup confirmation email:', emailError);
+        // Continue with signup process even if email fails
       }
       
       toast({

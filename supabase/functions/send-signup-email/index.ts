@@ -22,35 +22,38 @@ const handler = async (req: Request) => {
     
     console.log(`Sending signup confirmation email to ${to}`);
     
-    // In a real implementation with Resend, we'd use code like:
-    // const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
-    // await resend.emails.send({
-    //   from: 'Circa <notifications@example.com>',
-    //   to: [to],
-    //   subject: subject || 'Welcome to Circa!',
-    //   html: generateHtmlEmail(data),
-    // });
+    // Generate HTML email
+    const html = generateHtmlEmail(data);
     
-    // Log the data we'll use to create the email
-    console.log('Name:', data.name);
-    console.log('Company:', data.company);
-    console.log('Calendly URL:', data.calendlyUrl);
+    // Direct fetch to Resend API instead of using the package
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('RESEND_API_KEY')}`
+      },
+      body: JSON.stringify({
+        from: 'Circa <info@circa.site>', // Using your verified domain
+        to: [to],
+        subject: subject || 'Welcome to Circa!',
+        html: html
+      })
+    });
     
-    // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const responseData = await response.json();
+    
+    if (!response.ok) {
+      console.error('Resend API error:', responseData);
+      throw new Error('Failed to send email via Resend');
+    }
+    
+    console.log('Email sent successfully:', responseData);
     
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: `Signup confirmation email has been sent to ${to}`,
-        emailData: {
-          recipient: to,
-          subject: subject || 'Welcome to Circa!',
-          name: data.name,
-          company: data.company,
-          calendlyUrl: data.calendlyUrl,
-          timestamp: new Date().toISOString()
-        }
+        emailId: responseData?.id
       }),
       { 
         status: 200, 
@@ -66,5 +69,59 @@ const handler = async (req: Request) => {
     );
   }
 };
+
+// Create HTML email template for signup confirmation
+function generateHtmlEmail(data) {
+  const { name, company, calendlyUrl } = data;
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: 'Helvetica', sans-serif; line-height: 1.6; color: #334155; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #10b981; color: white; padding: 20px; border-radius: 4px 4px 0 0; }
+        .content { background-color: #f8fafc; padding: 20px; border-radius: 0 0 4px 4px; }
+        .footer { margin-top: 20px; font-size: 12px; color: #64748b; text-align: center; }
+        .button { display: inline-block; background-color: #10b981; color: white; padding: 12px 24px; 
+                 text-decoration: none; border-radius: 4px; margin-top: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Welcome to Circa!</h1>
+        </div>
+        <div class="content">
+          <p>Hello ${name || 'there'},</p>
+          
+          <p>Thank you for signing up with Circa! We're excited to have you on board.</p>
+          
+          ${company ? `<p>Company: <strong>${company}</strong></p>` : ''}
+          
+          <h2>Next Steps</h2>
+          <p>To help you get started with managing your carbon footprint:</p>
+          <ul>
+            <li>Complete your profile</li>
+            <li>Upload your energy and travel data</li>
+            <li>Explore your personalized dashboard</li>
+          </ul>
+          
+          <p>Want a personalized onboarding session? Our team is ready to assist you:</p>
+          
+          <a href="${calendlyUrl || 'https://calendly.com/circa-demo/30min'}" class="button">Schedule an Onboarding Call</a>
+          
+          <p>We're looking forward to helping you achieve your sustainability goals!</p>
+        </div>
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} Circa. All rights reserved.</p>
+          <p>This email was sent to confirm your registration with Circa.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
 
 serve(handler); 
