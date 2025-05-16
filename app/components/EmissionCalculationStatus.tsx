@@ -63,7 +63,9 @@ export function EmissionCalculationStatus({ companyId, scope }: EmissionStatusPr
         <div className="space-x-2">
           <Button 
             variant="outline" 
-            onClick={() => queryClient.invalidateQueries(['emissionStatus', companyId, scope])}
+            onClick={() => queryClient.invalidateQueries({
+              queryKey: ['emissionStatus', companyId, scope]
+            })}
             disabled={isCalculating || isStatusLoading}
           >
             {isStatusLoading ? (
