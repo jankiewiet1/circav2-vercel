@@ -238,7 +238,10 @@ export const Scope2Dashboard = ({ entries, loading, error, refetch }: Scope2Dash
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Legend formatter={(value, entry, index) => entry.payload.name} />
+                      <Legend formatter={(value, entry) => {
+                        // @ts-ignore - Recharts type definitions aren't complete
+                        return entry.payload?.name || value;
+                      }} />
                       <RechartsTooltip 
                         formatter={(value: number, name: string, props: any) => {
                           return [`${value.toFixed(2)} tCO₂e (${props.payload.percentage}%)`, props.payload.name];
