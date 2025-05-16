@@ -1,24 +1,26 @@
 import { useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Callback() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
 
   useEffect(() => {
     // Only run on client
     const handleCallback = async () => {
       const { error } = await supabase.auth.getSession();
       if (error) {
-        navigate('/auth/login', { state: { error: 'Authentication failed. Please try again.' } });
+        router.push({
+          pathname: '/auth/login',
+          query: { error: 'Authentication failed. Please try again.' }
+        });
         return;
       }
       // Redirect to dashboard on success
-      navigate('/dashboard');
+      router.push('/dashboard');
     };
     handleCallback();
-  }, [navigate]);
+  }, [router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-circa-green-light">
