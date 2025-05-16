@@ -24,6 +24,9 @@ const resources = {
   }
 };
 
+// In Next.js, process.env.NODE_ENV is automatically replaced at build time
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 i18n
   // detect user language
   .use(LanguageDetector)
@@ -33,7 +36,7 @@ i18n
   .init({
     resources,
     fallbackLng: 'en',
-    debug: process.env.NODE_ENV === 'development',
+    debug: isDevelopment,
     interpolation: {
       escapeValue: false, // not needed for react as it escapes by default
     },
@@ -47,8 +50,12 @@ i18n
 
 // Load dynamic translations from Supabase
 // This is done after initialization to prevent blocking the app startup
-addDynamicTranslations(i18n, ['marketing', 'email']).catch(error => {
-  console.error('Failed to load dynamic translations:', error);
-});
+try {
+  addDynamicTranslations(i18n, ['marketing', 'email']).catch(error => {
+    console.error('Failed to load dynamic translations:', error);
+  });
+} catch (error) {
+  console.error('Error initializing dynamic translations:', error);
+}
 
 export default i18n; 
