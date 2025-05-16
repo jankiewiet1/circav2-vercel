@@ -1,7 +1,13 @@
 import axios from 'axios';
 
-// Load API key from environment variable
-const CLIMATIQ_API_KEY = import.meta.env.VITE_CLIMATIQ_API_KEY || '2EJNHK4KN957591GX5J7Q6ZR9M'; // Fallback to test key
+// Load API key from environment variable - support both Vite and Next.js env formats
+const CLIMATIQ_API_KEY = 
+  // @ts-ignore - Next.js env
+  (typeof process !== 'undefined' && process.env && process.env.VITE_CLIMATIQ_API_KEY) || 
+  // @ts-ignore - Vite env
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_CLIMATIQ_API_KEY) || 
+  '2EJNHK4KN957591GX5J7Q6ZR9M'; // Fallback to test key
+
 const CLIMATIQ_API_URL = 'https://api.climatiq.io';
 
 // Create a reusable Axios instance with the Climatiq API configuration
