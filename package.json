@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "next:build": "NEXT_DISABLE_ESLINT=1 next build",
+    "next:build": "NEXT_DISABLE_ESLINT=1 VITE_CLIMATIQ_API_KEY=placeholder NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder next build",
     "lint": "eslint .",
     "preview": "vite preview",
     "calculate-emissions": "node scripts/climatiq/calculate-emissions.js",
