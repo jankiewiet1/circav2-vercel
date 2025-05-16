@@ -1,5 +1,4 @@
-
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { FileQuestion } from "lucide-react";
 
@@ -18,7 +17,7 @@ export default function NotFound() {
           We couldn't find the page you're looking for. It might have been moved or doesn't exist.
         </p>
         <Button asChild className="bg-circa-green hover:bg-circa-green-dark">
-          <Link to="/dashboard">
+          <Link href="/dashboard">
             Return to Dashboard
           </Link>
         </Button>
