@@ -1,142 +1,72 @@
-
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { useRouter } from "next/router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { useCompany } from "@/contexts/CompanyContext";
-import { SetupLayout } from "@/components/setup/SetupLayout";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { ArrowLeft, ArrowRight, Plus, Trash2, UserRound } from "lucide-react";
-import { CompanyMember, UserRole } from "@/types";
-
-const userRoles: { value: UserRole; label: string }[] = [
-  { value: "admin", label: "Administrator" },
-  { value: "editor", label: "Editor" },
-  { value: "viewer", label: "Viewer" },
-];
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/ui/use-toast";
+import { useCompany } from "@/context/CompanyContext";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, Mail, UserPlus, X } from "lucide-react";
+import { LoadingButton } from "@/components/ui/loading-button";
 
 const inviteFormSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  role: z.enum(["admin", "editor", "viewer"] as const),
+  email: z.string().email("Please enter a valid email address"),
+  role: z.enum(["admin", "member", "viewer"], {
+    required_error: "Please select a user role",
+  }),
 });
 
 type InviteFormValues = z.infer<typeof inviteFormSchema>;
 
 export default function CompanyTeam() {
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const router = useRouter();
   const { companyMembers, inviteMember, updateMemberRole, removeMember } = useCompany();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [memberToRemove, setMemberToRemove] = useState<CompanyMember | null>(null);
-  const [memberToEdit, setMemberToEdit] = useState<CompanyMember | null>(null);
+
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<null | { id: string, email: string, role: string }>(null);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   
   const form = useForm<InviteFormValues>({
     resolver: zodResolver(inviteFormSchema),
     defaultValues: {
       email: "",
-      role: "viewer",
+      role: "member",
     },
   });
-
-  const roleForm = useForm<{ role: UserRole }>({
-    resolver: zodResolver(z.object({
-      role: z.enum(["admin", "editor", "viewer"] as const),
-    })),
-    defaultValues: {
-      role: "viewer",
-    },
-  });
-
-  // Set the default role when editing a member
-  useEffect(() => {
-    if (memberToEdit) {
-      roleForm.setValue("role", memberToEdit.role as UserRole);
-    }
-  }, [memberToEdit, roleForm]);
-
-  const onInviteMember = async (data: InviteFormValues) => {
-    setIsSubmitting(true);
-    
+  
+  const onInviteSubmit = async (values: InviteFormValues) => {
     try {
-      await inviteMember(data.email, data.role);
-      form.reset();
+      await inviteMember(values.email, values.role);
       toast({
-        title: "Invitation Sent",
-        description: `An invitation has been sent to ${data.email}`,
+        title: "Invitation sent",
+        description: `An invitation has been sent to ${values.email}`,
       });
+      form.reset();
+      setIsInviteDialogOpen(false);
     } catch (error) {
       console.error("Error inviting member:", error);
       toast({
         title: "Error",
-        description: "Failed to send invitation",
+        description: "Failed to send invitation. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
-
-  const handleUpdateRole = async (memberId: string, role: UserRole) => {
+  
+  const handleChangeRole = async (memberId: string, newRole: string) => {
     try {
-      await updateMemberRole(memberId, role);
-      setMemberToEdit(null);
+      await updateMemberRole(memberId, newRole);
       toast({
-        title: "Role Updated",
+        title: "Role updated",
         description: "Member role has been updated successfully",
       });
     } catch (error) {
@@ -148,13 +78,13 @@ export default function CompanyTeam() {
       });
     }
   };
-
+  
   const handleRemoveMember = async (memberId: string) => {
+    setIsDeleting(memberId);
     try {
       await removeMember(memberId);
-      setMemberToRemove(null);
       toast({
-        title: "Member Removed",
+        title: "Member removed",
         description: "Team member has been removed successfully",
       });
     } catch (error) {
@@ -164,246 +94,181 @@ export default function CompanyTeam() {
         description: "Failed to remove team member",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleting(null);
     }
   };
-
-  const goBack = () => navigate("/company/setup/info");
-  const goNext = () => navigate("/company/setup/preferences");
-
+  
   return (
-    <SetupLayout 
-      currentStep={2} 
-      totalSteps={3} 
-      title="Team Members" 
-      description="Manage who has access to your company's carbon accounting"
-    >
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Current Team Members</CardTitle>
-            <CardDescription>
-              People who currently have access to your company data
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {companyMembers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
-                      No team members added yet
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  companyMembers.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell className="font-medium">{member.user_id}</TableCell>
-                      <TableCell>
-                        <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
-                          member.role === 'admin' ? 'bg-blue-100 text-blue-800' : 
-                          member.role === 'editor' ? 'bg-green-100 text-green-800' : 
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {member.role === 'admin' ? 'Administrator' : 
-                           member.role === 'editor' ? 'Editor' : 'Viewer'}
-                        </span>
-                      </TableCell>
-                      <TableCell>Active</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setMemberToEdit(member)}
-                            >
-                              Edit
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Change User Role</DialogTitle>
-                              <DialogDescription>
-                                Update the permissions for this team member
-                              </DialogDescription>
-                            </DialogHeader>
-                            
-                            <Form {...roleForm}>
-                              <form onSubmit={roleForm.handleSubmit((data) => {
-                                if (memberToEdit) {
-                                  handleUpdateRole(memberToEdit.id, data.role);
-                                }
-                              })}>
-                                <FormField
-                                  control={roleForm.control}
-                                  name="role"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Role</FormLabel>
-                                      <Select 
-                                        onValueChange={field.onChange}
-                                        defaultValue={field.value}
-                                      >
-                                        <FormControl>
-                                          <SelectTrigger>
-                                            <SelectValue placeholder="Select a role" />
-                                          </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                          {userRoles.map((role) => (
-                                            <SelectItem key={role.value} value={role.value}>
-                                              {role.label}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-
-                                <DialogFooter className="mt-4">
-                                  <DialogClose asChild>
-                                    <Button variant="outline">Cancel</Button>
-                                  </DialogClose>
-                                  <Button type="submit">Save Changes</Button>
-                                </DialogFooter>
-                              </form>
-                            </Form>
-                          </DialogContent>
-                        </Dialog>
-                        
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-red-500 border-red-200 hover:bg-red-50"
-                              onClick={() => setMemberToRemove(member)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Remove Team Member</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to remove this team member? 
-                                They will lose all access to your company's carbon accounting data.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-red-500 hover:bg-red-600"
-                                onClick={() => memberToRemove && handleRemoveMember(memberToRemove.id)}
-                              >
-                                Remove
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Invite New Team Member</CardTitle>
-            <CardDescription>
-              Send invitations to colleagues to join your carbon accounting team
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onInviteMember)} className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div className="md:col-span-2">
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email Address</FormLabel>
-                          <FormControl>
-                            <Input placeholder="colleague@company.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <FormField
-                    control={form.control}
-                    name="role"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Role</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select role" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {userRoles.map((role) => (
-                              <SelectItem key={role.value} value={role.value}>
-                                {role.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                <Button 
-                  type="submit" 
-                  className="mt-2"
-                  disabled={isSubmitting}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  {isSubmitting ? "Sending..." : "Send Invitation"}
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-
-        <div className="flex justify-between pt-6">
-          <Button
-            variant="outline"
-            onClick={goBack}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Previous Step
-          </Button>
-          
-          <Button
-            className="bg-circa-green hover:bg-circa-green-dark"
-            onClick={goNext}
-          >
-            Next Step
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+    <Card className="shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>Team Members</CardTitle>
+          <CardDescription>
+            Manage your company team and adjust permissions
+          </CardDescription>
         </div>
-      </div>
-    </SetupLayout>
+        <Button onClick={() => setIsInviteDialogOpen(true)}>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Invite Member
+        </Button>
+      </CardHeader>
+      
+      <CardContent>
+        {companyMembers && companyMembers.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {companyMembers.map((member) => (
+                <TableRow key={member.id}>
+                  <TableCell>{member.email}</TableCell>
+                  <TableCell>
+                    <Select
+                      defaultValue={member.role}
+                      onValueChange={(value) => handleChangeRole(member.id, value)}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="member">Member</SelectItem>
+                        <SelectItem value="viewer">Viewer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={member.status === "active" ? "success" : "secondary"}>
+                      {member.status === "active" ? "Active" : "Pending"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => handleRemoveMember(member.id)}
+                      disabled={isDeleting === member.id}
+                    >
+                      {isDeleting === member.id ? (
+                        <span className="animate-spin">⏳</span>
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>No team members yet</AlertTitle>
+            <AlertDescription>
+              Your company doesn't have any team members yet. Invite colleagues to collaborate.
+            </AlertDescription>
+          </Alert>
+        )}
+      </CardContent>
+      
+      <CardFooter className="flex justify-between">
+        <Button 
+          variant="outline" 
+          onClick={() => router.push("/company/setup/info")}
+        >
+          Back
+        </Button>
+        <Button onClick={() => router.push("/company/setup/preferences")}>
+          Next Step
+        </Button>
+      </CardFooter>
+      
+      <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite Team Member</DialogTitle>
+            <DialogDescription>
+              Send an invitation to join your company account
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onInviteSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Address</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="colleague@example.com" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="member">Member</SelectItem>
+                        <SelectItem value="viewer">Viewer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      <p><strong>Admin:</strong> Full control of company settings and data</p>
+                      <p><strong>Member:</strong> Can add and edit data</p>
+                      <p><strong>Viewer:</strong> Can only view reports and dashboards</p>
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsInviteDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <LoadingButton 
+                  type="submit"
+                  isLoading={form.formState.isSubmitting}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Invitation
+                </LoadingButton>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }
