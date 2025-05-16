@@ -1,12 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
-const supabaseUrl = typeof window !== 'undefined' 
-  ? process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co'
-  : 'https://example.supabase.co';
-const supabaseAnonKey = typeof window !== 'undefined'
-  ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder'
-  : 'placeholder';
+let supabaseUrl = 'https://example.supabase.co';
+let supabaseAnonKey = 'placeholder';
+
+try {
+  // Only access process.env if it exists
+  if (typeof process !== 'undefined' && process.env) {
+    supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl;
+    supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || supabaseAnonKey;
+  }
+} catch (error) {
+  console.warn('Using fallback Supabase values');
+}
+
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Types
