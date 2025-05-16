@@ -1,277 +1,291 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { z } from "zod";
+import { useToast } from "@/hooks/ui/use-toast";
+import { useCompany } from "@/context/CompanyContext";
 import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { useCompany } from "@/contexts/CompanyContext";
-import { SetupLayout } from "@/components/setup/SetupLayout";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ArrowRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { LoadingButton } from "@/components/ui/loading-button";
+import { INDUSTRY_TYPES } from "@/lib/constants";
+import { COUNTRIES } from "@/lib/countries";
 
-const industries = [ /* your industries array */ ];
-const countries = [ /* your countries array */ ];
-
+// Defining the form schema
 const formSchema = z.object({
-  name: z.string().min(1, "Company name is required"),
-  industry: z.string().min(1, "Industry is required"),
-  country: z.string().min(1, "Country is required"),
-  kvkNumber: z.string().optional(),
-  vatNumber: z.string().optional(),
-  iban: z.string().optional(),
-  bankName: z.string().optional(),
-  billingEmail: z.string().email("Invalid email address").optional().or(z.literal("")),
-  phoneNumber: z.string().optional(),
-  billingAddress: z.string().optional(),
-  postalCode: z.string().optional(),
+  name: z.string().min(2, "Name must be at least 2 characters").max(100),
+  industry: z.string().min(1, "Please select an industry"),
+  country: z.string().min(1, "Please select a country"),
+  kvk_number: z.string().optional(),
+  vat_number: z.string().optional(),
+  address: z.string().optional(),
   city: z.string().optional(),
-  contactName: z.string().optional(),
-  contactTitle: z.string().optional(),
-  contactEmail: z.string().email("Invalid email address").optional().or(z.literal("")),
+  state: z.string().optional(),
+  postal_code: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
 export default function CompanyInfo() {
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const router = useRouter();
   const { company, updateCompany, createCompany } = useCompany();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isEditing, setIsEditing] = useState(false); // If no company, start in edit mode
-
+  
+  const [isSaving, setIsSaving] = useState(false);
+  const [isNewCompany, setIsNewCompany] = useState(false);
+  
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: company?.name || "",
       industry: company?.industry || "",
       country: company?.country || "",
-      kvkNumber: company?.kvk_number || "",
-      vatNumber: company?.vat_number || "",
-      iban: company?.iban || "",
-      bankName: company?.bank_name || "",
-      billingEmail: company?.billing_email || "",
-      phoneNumber: company?.phone_number || "",
-      billingAddress: company?.billing_address || "",
-      postalCode: company?.postal_code || "",
+      kvk_number: company?.kvk_number || "",
+      vat_number: company?.vat_number || "",
+      address: company?.address || "",
       city: company?.city || "",
-      contactName: company?.contact_name || "",
-      contactTitle: company?.contact_title || "",
-      contactEmail: company?.contact_email || "",
+      state: company?.state || "",
+      postal_code: company?.postal_code || "",
     },
   });
-
-  const onSubmit = async (data: FormValues) => {
-    setIsSubmitting(true);
-
+  
+  useEffect(() => {
+    if (!company?.id) {
+      setIsNewCompany(true);
+    }
+  }, [company]);
+  
+  const onSubmit = async (values: FormValues) => {
+    setIsSaving(true);
     try {
-      if (company) {
-        await updateCompany({ ...data });
+      if (isNewCompany) {
+        await createCompany(values);
         toast({
-          title: "Company Updated",
-          description: "Company information saved successfully.",
+          title: "Company created",
+          description: "Your company has been created successfully",
         });
-        setIsEditing(false);
       } else {
-        const result = await createCompany(data.name, data.industry);
-        if (result.company) {
-          await updateCompany({ ...data });
-          navigate("/company/setup/team");
-        }
+        await updateCompany(values);
+        toast({
+          title: "Company updated",
+          description: "Your company information has been updated",
+        });
       }
+      
+      router.push("/company/setup/team");
     } catch (error) {
-      console.error("Error saving company info:", error);
+      console.error("Error saving company:", error);
       toast({
         title: "Error",
-        description: "Failed to save company information",
+        description: "There was an error saving your company information",
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      setIsSaving(false);
     }
   };
-
-  const renderField = (
-    name: keyof FormValues,
-    label: string,
-    placeholder: string,
-    type: string = "text"
-  ) => (
-    <FormField
-      control={form.control}
-      name={name}
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>{label}</FormLabel>
-          <FormControl>
-            <Input
-              type={type}
-              placeholder={placeholder}
-              {...field}
-              readOnly={!isEditing}
-            />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-  );
-
+  
   return (
-    <SetupLayout
-      currentStep={1}
-      totalSteps={3}
-      title="Company Information"
-      description="Set up your company details for carbon accounting"
-    >
-      <div className="flex justify-end mb-4">
-  {!isEditing ? (
-    <Button onClick={() => setIsEditing(true)}>Edit Company</Button>
-  ) : (
-    <div className="flex gap-2">
-       <Button
-          type="submit"
-           form="companyForm"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? "Saving..." : "Save Changes"}
-        </Button>
-         <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-               setIsEditing(false);       // Exit edit mode
-              form.reset();              // Reset the form to last saved state
-             }}
-          >
-            Cancel
-           </Button>
-         </div>
-       )}
-     </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Company Information</CardTitle>
+        <CardDescription>
+          Tell us about your company to personalize your carbon accounting experience
+        </CardDescription>
+      </CardHeader>
       
       <Form {...form}>
-        <form
-          id="companyForm"
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-6"
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Basic Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {renderField("name", "Company Name", "Enter your company name")}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter your company name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="industry"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Industry</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select industry" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {INDUSTRY_TYPES.map((industry) => (
+                          <SelectItem key={industry.value} value={industry.value}>
+                            {industry.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Country</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select country" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {COUNTRIES.map((country) => (
+                          <SelectItem key={country.code} value={country.code}>
+                            {country.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="kvk_number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>KVK Number (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter KVK number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <FormField
+              control={form.control}
+              name="vat_number"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>VAT Number (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter VAT number" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <div className="space-y-2">
+              <h3 className="font-medium">Company Address (Optional)</h3>
+              
+              <div className="grid grid-cols-1 gap-4">
                 <FormField
                   control={form.control}
-                  name="industry"
+                  name="address"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Industry</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        disabled={!isEditing}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select industry" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {industries.map((industry) => (
-                            <SelectItem key={industry.value} value={industry.value}>
-                              {industry.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="country"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Country</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        disabled={!isEditing}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select country" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {countries.map((country) => (
-                            <SelectItem key={country.value} value={country.value}>
-                              {country.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>Street Address</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter address" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Add similar sections using renderField() or inline like above: */}
-          <Card>
-            <CardHeader><CardTitle>Financial Info</CardTitle></CardHeader>
-            <CardContent className="grid md:grid-cols-2 gap-4">
-              {renderField("kvkNumber", "KVK Number", "")}
-              {renderField("vatNumber", "VAT Number", "")}
-              {renderField("iban", "IBAN", "")}
-              {renderField("bankName", "Bank Name", "")}
-              {renderField("billingEmail", "Billing Email", "")}
-              {renderField("phoneNumber", "Phone Number", "")}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>Billing Address</CardTitle></CardHeader>
-            <CardContent className="grid md:grid-cols-2 gap-4">
-              {renderField("billingAddress", "Street", "")}
-              {renderField("postalCode", "Postal Code", "")}
-              {renderField("city", "City", "")}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>Primary Contact</CardTitle></CardHeader>
-            <CardContent className="grid md:grid-cols-2 gap-4">
-              {renderField("contactName", "Contact Name", "")}
-              {renderField("contactTitle", "Contact Title", "")}
-              {renderField("contactEmail", "Contact Email", "")}
-            </CardContent>
-          </Card>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter city" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State/Province</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter state/province" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="postal_code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Postal Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter postal code" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+          </CardContent>
+          
+          <CardFooter className="flex justify-between">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => router.push("/dashboard")}
+            >
+              Cancel
+            </Button>
+            
+            <LoadingButton 
+              type="submit"
+              isLoading={isSaving}
+            >
+              {isNewCompany ? "Create Company" : "Save & Continue"}
+            </LoadingButton>
+          </CardFooter>
         </form>
       </Form>
-    </SetupLayout>
+    </Card>
   );
 }
 

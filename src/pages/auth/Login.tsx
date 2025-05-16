@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/router";
 import { useTranslation } from "react-i18next";
 import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
@@ -8,43 +9,47 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useAuth } from "@/contexts/AuthContext";
+import { AlertCircle } from "lucide-react";
+import { FormItem } from "@/components/ui/form";
 import { Loader2 } from "lucide-react";
+import { LanguageSelector } from "@/components/ui/language-selector";
+import { Logo } from "@/components/branding/Logo";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Login() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { signIn, session, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const { redirect } = router.query;
+  const from = redirect ? String(redirect) : "/dashboard";
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(true);
+  const [remember, setRemember] = useState(false);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   
-  const from = (location.state as any)?.from?.pathname || "/dashboard";
-
-  // Watch for session changes
+  const { signIn, session } = useAuth();
+  
+  // Redirect if user is already logged in
   useEffect(() => {
-    if (session && !authLoading) {
-      console.log("Session detected, navigating to:", from);
-      navigate(from, { replace: true });
+    if (session) {
+      router.replace(from);
     }
-  }, [session, authLoading, navigate, from]);
+  }, [session, router, from]);
   
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
     setLoading(true);
-    setError(null);
     
     try {
-      const { error } = await signIn(email, password, rememberMe);
-      
+      const { error } = await signIn(email, password, remember);
       if (error) {
-        console.error("Login error:", error);
-        setError(error.message || "An error occurred during login");
+        throw error;
       }
-    } finally {
+      // Navigation handled by useEffect
+    } catch (error: any) {
+      setError(error.message || t('login.genericError', 'Login failed. Please try again.'));
       setLoading(false);
     }
   };
@@ -52,113 +57,119 @@ export default function Login() {
   return (
     <>
       <Helmet>
-        <title>{t('login.pageTitle')} | Circa</title>
-        <meta name="description" content={t('login.pageDescription')} />
+        <title>{t('login.pageTitle', 'Log In')} | Circa</title>
+        <meta name="description" content={t('login.pageDescription', 'Log in to your Circa account')} />
       </Helmet>
-
-      <div className="flex min-h-screen flex-col">
+      
+      <div className="min-h-screen flex flex-col">
         <header className="border-b py-4">
           <div className="container flex items-center justify-between">
-            <Link to="/">
-              <img src="/logo.svg" alt="Circa" className="h-8" />
+            <Link href="/">
+              <Logo className="h-8 w-auto" />
             </Link>
-            <Button variant="ghost" asChild>
-              <Link to="/auth/signup">{t('common.signup')}</Link>
-            </Button>
+            <div className="flex items-center space-x-4">
+              <LanguageSelector />
+              <Button variant="primary" asChild>
+                <Link href="/auth/register">{t('common.signup', 'Sign up')}</Link>
+              </Button>
+            </div>
           </div>
         </header>
-
+        
         <main className="flex-1 container py-12">
           <div className="max-w-md mx-auto">
-            <div className="mb-12 text-center">
-              <h1 className="text-3xl font-bold tracking-tight mb-3">
-                {t('login.title')}
+            <div className="mb-8 text-center">
+              <h1 className="text-2xl font-bold tracking-tight">
+                {t('login.title', 'Log in to your account')}
               </h1>
-              <p className="text-lg text-gray-600">
-                {t('login.subtitle')}
+              <p className="text-sm text-gray-600 mt-2">
+                {t('login.subtitle', 'Enter your email and password to access your account')}
               </p>
             </div>
             
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('login.welcomeBack')}</CardTitle>
-                <CardDescription>{t('login.enterCredentials')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {error && (
-                  <Alert variant="destructive" className="mb-6">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-                
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">{t('common.email')}</Label>
-                    <Input 
-                      id="email" 
-                      type="email" 
-                      placeholder="you@example.com" 
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="password">{t('common.password')}</Label>
-                      <Link to="/auth/reset-password" className="text-xs text-primary hover:underline">
-                        {t('login.forgotPassword')}
-                      </Link>
-                    </div>
-                    <Input 
-                      id="password" 
-                      type="password"
-                      placeholder="••••••••" 
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="remember-me" 
-                      checked={rememberMe}
-                      onCheckedChange={(checked) => setRememberMe(checked === true)}
-                    />
-                    <Label 
-                      htmlFor="remember-me" 
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      {t('login.rememberMe')}
-                    </Label>
-                  </div>
-                  
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
-                    disabled={loading || authLoading}
+            {error && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            
+            <form onSubmit={handleLogin} className="space-y-6">
+              <FormItem>
+                <Label htmlFor="email">{t('common.email', 'Email')}</Label>
+                <Input 
+                  id="email"
+                  type="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  autoComplete="email"
+                />
+              </FormItem>
+              
+              <FormItem>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">{t('common.password', 'Password')}</Label>
+                  <Link 
+                    href="/auth/forgot-password"
+                    className="text-sm font-semibold text-primary hover:text-primary/90"
                   >
-                    {(loading || authLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {t('login.signIn')}
-                  </Button>
-                </form>
-              </CardContent>
-              <CardFooter className="flex justify-center border-t pt-6">
-                <Button variant="ghost" asChild>
-                  <Link to="/auth/signup">
-                    {t('login.noAccount')} {t('common.signup')}
+                    {t('login.forgotPassword', 'Forgot password?')}
                   </Link>
-                </Button>
-              </CardFooter>
-            </Card>
+                </div>
+                <Input 
+                  id="password"
+                  type="password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  autoComplete="current-password"
+                />
+              </FormItem>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="remember" 
+                  checked={remember}
+                  onCheckedChange={(checked) => setRemember(checked as boolean)}
+                />
+                <label 
+                  htmlFor="remember"
+                  className="text-sm text-gray-500 cursor-pointer"
+                >
+                  {t('login.rememberMe', 'Remember me')}
+                </label>
+              </div>
+              
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('common.loading', 'Loading...')}
+                  </>
+                ) : (
+                  t('login.loginButton', 'Log in')
+                )}
+              </Button>
+              
+              <div className="text-center text-sm text-gray-500">
+                {t('login.noAccount', "Don't have an account?")}{' '}
+                <Link 
+                  href="/auth/register"
+                  className="font-semibold text-primary hover:text-primary/90"
+                >
+                  {t('login.createAccount', 'Create an account')}
+                </Link>
+              </div>
+            </form>
           </div>
         </main>
-
+        
         <footer className="py-6 border-t">
           <div className="container text-center text-sm text-gray-500">
-            <p>© {new Date().getFullYear()} Circa. {t('common.allRightsReserved')}</p>
+            <p>© {new Date().getFullYear()} Circa. {t('common.allRightsReserved', 'All rights reserved')}</p>
           </div>
         </footer>
       </div>
