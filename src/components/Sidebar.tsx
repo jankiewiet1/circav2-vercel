@@ -1,4 +1,5 @@
-import { Link, useLocation } from "react-router-dom";
+import Link from "next/link";
+import { useRouter } from "next/router";
 import React, { useState, useCallback, memo } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,8 +25,8 @@ import {
 const MemoizedLogo = memo(Logo);
 
 // Memoize NavLink component
-const NavLink = memo(({ to, icon, label, isExpanded, isActive }: {
-  to: string;
+const NavLink = memo(({ href, icon, label, isExpanded, isActive }: {
+  href: string;
   icon: React.ReactNode;
   label: string;
   isExpanded: boolean;
@@ -33,7 +34,7 @@ const NavLink = memo(({ to, icon, label, isExpanded, isActive }: {
 }) => {
   return (
     <Link
-      to={to}
+      href={href}
       className={cn(
         "flex items-center px-4 py-2.5 text-sm font-medium rounded-md",
         "transition-all duration-300",
@@ -58,7 +59,7 @@ NavLink.displayName = 'NavLink';
 export const Sidebar = () => {
   const { company } = useCompany();
   const { signOut } = useAuth();
-  const location = useLocation();
+  const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
   
   const handleMouseEnter = useCallback(() => {
@@ -74,8 +75,8 @@ export const Sidebar = () => {
   }, [signOut]);
   
   const isPathActive = useCallback((path: string) => {
-    return location.pathname.startsWith(path);
-  }, [location.pathname]);
+    return router.pathname.startsWith(path);
+  }, [router.pathname]);
   
   return (
     <aside 
@@ -89,16 +90,16 @@ export const Sidebar = () => {
     >
       {/* Logo */}
       <div className="p-3 flex items-center justify-center">
-        <Link to="/dashboard">
+        <Link href="/dashboard">
           <MemoizedLogo variant="light" withText={isExpanded} className="transition-all duration-300" isLink={false} />
         </Link>
       </div>
       
       {/* Navigation */}
       <nav className="flex-1 px-1.5 py-3 space-y-0.5 overflow-y-auto">
-        <NavLink to="/dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" isExpanded={isExpanded} isActive={isPathActive('/dashboard')} />
-        <NavLink to="/reports" icon={<FileText size={18} />} label="Reports" isExpanded={isExpanded} isActive={isPathActive('/reports')} />
-        <NavLink to="/data-upload" icon={<Upload size={18} />} label="Data Upload" isExpanded={isExpanded} isActive={isPathActive('/data-upload')} />
+        <NavLink href="/dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" isExpanded={isExpanded} isActive={isPathActive('/dashboard')} />
+        <NavLink href="/reports" icon={<FileText size={18} />} label="Reports" isExpanded={isExpanded} isActive={isPathActive('/reports')} />
+        <NavLink href="/data-upload" icon={<Upload size={18} />} label="Data Upload" isExpanded={isExpanded} isActive={isPathActive('/data-upload')} />
         
         <div className="pt-4 pb-1">
           <div className={cn(
@@ -109,9 +110,9 @@ export const Sidebar = () => {
           </div>
         </div>
         
-        <NavLink to="/emissions/scope1" icon={<Flame size={18} />} label="Scope 1" isExpanded={isExpanded} isActive={isPathActive('/emissions/scope1')} />
-        <NavLink to="/emissions/scope2" icon={<Wind size={18} />} label="Scope 2" isExpanded={isExpanded} isActive={isPathActive('/emissions/scope2')} />
-        <NavLink to="/emissions/scope3" icon={<Truck size={18} />} label="Scope 3" isExpanded={isExpanded} isActive={isPathActive('/emissions/scope3')} />
+        <NavLink href="/emissions/scope1" icon={<Flame size={18} />} label="Scope 1" isExpanded={isExpanded} isActive={isPathActive('/emissions/scope1')} />
+        <NavLink href="/emissions/scope2" icon={<Wind size={18} />} label="Scope 2" isExpanded={isExpanded} isActive={isPathActive('/emissions/scope2')} />
+        <NavLink href="/emissions/scope3" icon={<Truck size={18} />} label="Scope 3" isExpanded={isExpanded} isActive={isPathActive('/emissions/scope3')} />
         
         <div className="pt-4 pb-1">
           <div className={cn(
@@ -123,19 +124,19 @@ export const Sidebar = () => {
         </div>
         
         <NavLink
-          to={company ? "/company/manage" : "/company/setup"}
+          href={company ? "/company/manage" : "/company/setup"}
           icon={<Building2 size={18} />}
           label="Your Company"
           isExpanded={isExpanded}
           isActive={isPathActive('/company')}
         />
-        <NavLink to="/profile" icon={<UserRound size={18} />} label="Profile" isExpanded={isExpanded} isActive={isPathActive('/profile')} />
-        <NavLink to="/settings" icon={<Settings size={18} />} label="Settings" isExpanded={isExpanded} isActive={isPathActive('/settings')} />
+        <NavLink href="/profile" icon={<UserRound size={18} />} label="Profile" isExpanded={isExpanded} isActive={isPathActive('/profile')} />
+        <NavLink href="/settings" icon={<Settings size={18} />} label="Settings" isExpanded={isExpanded} isActive={isPathActive('/settings')} />
       </nav>
       
       {/* Footer */}
       <div className="p-1.5 border-t border-white/10">
-        <NavLink to="/help" icon={<HelpCircle size={18} />} label="Help" isExpanded={isExpanded} isActive={isPathActive('/help')} />
+        <NavLink href="/help" icon={<HelpCircle size={18} />} label="Help" isExpanded={isExpanded} isActive={isPathActive('/help')} />
         <button 
           className={cn(
             "w-full flex items-center px-3 py-2 text-sm font-medium rounded-md",

@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { createClient } from '@supabase/supabase-js';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { useAuth } from '@/contexts/AuthContext';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,11 +17,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
-// Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { supabase } from '@/integrations/supabase/client';
 
 // Form validation schemas
 const basicInfoSchema = z.object({
@@ -48,8 +46,8 @@ const sustainabilityGoalsSchema = z.object({
   stakeholderReporting: z.boolean().optional(),
   other: z.boolean().optional(),
   otherGoals: z.string().optional(),
-  termsAccepted: z.literal(true, {
-    errorMap: () => ({ message: 'You must accept the terms and conditions' })
+  termsAccepted: z.boolean().refine(val => val === true, { 
+    message: 'You must accept the terms and conditions'
   })
 });
 
@@ -61,6 +59,8 @@ export type SignUpFormData = BasicInfoFormData & CompanyDetailsFormData & Sustai
 
 export default function SignUpForm() {
   const { t } = useTranslation();
+  const router = useRouter();
+  const { signUp } = useAuth();
   const [currentStep, setCurrentStep] = useState<string>('basicInfo');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -125,47 +125,53 @@ export default function SignUpForm() {
     } as SignUpFormData;
     
     try {
-      // 1. Create user account
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: completeFormData.email,
-        password: completeFormData.password,
-        options: {
-          data: {
-            first_name: completeFormData.firstName,
-            last_name: completeFormData.lastName
-          }
+      // 1. Create user account using AuthContext
+      const { error: signUpError, user } = await signUp(
+        completeFormData.email,
+        completeFormData.password,
+        completeFormData.firstName,
+        completeFormData.lastName
+      );
+      
+      if (signUpError) throw signUpError;
+      
+      // 2. Store company and sustainability goals info in localStorage
+      // (since we can't directly add to waitlist table in our typed schema)
+      const userPreferences = {
+        companyName: completeFormData.companyName,
+        companySize: completeFormData.companySize,
+        industry: completeFormData.industry,
+        companyWebsite: completeFormData.companyWebsite,
+        companyAddress: completeFormData.companyAddress,
+        goals: {
+          regulatoryCompliance: completeFormData.regulatoryCompliance,
+          carbonReduction: completeFormData.carbonReduction,
+          sustainableSupplyChain: completeFormData.sustainableSupplyChain,
+          stakeholderReporting: completeFormData.stakeholderReporting,
+          other: completeFormData.other,
+          otherGoals: completeFormData.otherGoals
         }
-      });
+      };
       
-      if (authError) throw authError;
+      // Store company info for future use
+      localStorage.setItem('userPreferences', JSON.stringify(userPreferences));
       
-      // 2. Add user to waitlist
-      const { error: waitlistError } = await supabase
-        .from('waitlist')
-        .insert({
-          user_id: authData.user?.id,
+      // 3. Try to store lead information in the leads table
+      try {
+        await supabase.from('leads').insert({
           email: completeFormData.email,
-          first_name: completeFormData.firstName,
-          last_name: completeFormData.lastName,
-          company_name: completeFormData.companyName,
-          company_size: completeFormData.companySize,
-          industry: completeFormData.industry,
-          company_website: completeFormData.companyWebsite,
-          company_address: completeFormData.companyAddress,
-          goals: {
-            regulatory_compliance: completeFormData.regulatoryCompliance,
-            carbon_reduction: completeFormData.carbonReduction,
-            sustainable_supply_chain: completeFormData.sustainableSupplyChain,
-            stakeholder_reporting: completeFormData.stakeholderReporting,
-            other: completeFormData.other,
-            other_details: completeFormData.otherGoals
-          },
-          status: 'pending'
+          name: `${completeFormData.firstName} ${completeFormData.lastName}`,
+          company: completeFormData.companyName,
+          status: 'signup'
         });
-        
-      if (waitlistError) throw waitlistError;
+      } catch (leadError) {
+        console.error('Failed to store lead data, but continuing signup flow:', leadError);
+        // Non-critical error, don't block the signup flow
+      }
       
-      setSuccess(true);
+      // Redirect to success page
+      router.push(`/auth/success?email=${encodeURIComponent(completeFormData.email)}&firstName=${encodeURIComponent(completeFormData.firstName)}&lastName=${encodeURIComponent(completeFormData.lastName)}`);
+      
     } catch (error: any) {
       console.error('Error during sign up:', error);
       setError(error.message || 'An error occurred during sign up');
@@ -187,7 +193,11 @@ export default function SignUpForm() {
           <p className="text-gray-700 mb-6">
             Thanks for signing up! We'll notify you as soon as your account is ready.
           </p>
-          <Button onClick={() => window.location.href = '/'}>
+          <Button
+            onClick={() => {
+              router.push('/');
+            }}
+          >
             Return to Homepage
           </Button>
         </CardContent>
@@ -430,7 +440,7 @@ export default function SignUpForm() {
                       id="regulatoryCompliance"
                       checked={sustainabilityGoalsForm.watch('regulatoryCompliance')}
                       onCheckedChange={(checked) => 
-                        sustainabilityGoalsForm.setValue('regulatoryCompliance', checked as boolean)
+                        sustainabilityGoalsForm.setValue('regulatoryCompliance', checked === true)
                       }
                     />
                     <div>
@@ -446,7 +456,7 @@ export default function SignUpForm() {
                       id="carbonReduction"
                       checked={sustainabilityGoalsForm.watch('carbonReduction')}
                       onCheckedChange={(checked) => 
-                        sustainabilityGoalsForm.setValue('carbonReduction', checked as boolean)
+                        sustainabilityGoalsForm.setValue('carbonReduction', checked === true)
                       }
                     />
                     <div>
@@ -462,7 +472,7 @@ export default function SignUpForm() {
                       id="sustainableSupplyChain"
                       checked={sustainabilityGoalsForm.watch('sustainableSupplyChain')}
                       onCheckedChange={(checked) => 
-                        sustainabilityGoalsForm.setValue('sustainableSupplyChain', checked as boolean)
+                        sustainabilityGoalsForm.setValue('sustainableSupplyChain', checked === true)
                       }
                     />
                     <div>
@@ -478,7 +488,7 @@ export default function SignUpForm() {
                       id="stakeholderReporting"
                       checked={sustainabilityGoalsForm.watch('stakeholderReporting')}
                       onCheckedChange={(checked) => 
-                        sustainabilityGoalsForm.setValue('stakeholderReporting', checked as boolean)
+                        sustainabilityGoalsForm.setValue('stakeholderReporting', checked === true)
                       }
                     />
                     <div>
@@ -494,7 +504,7 @@ export default function SignUpForm() {
                       id="other"
                       checked={sustainabilityGoalsForm.watch('other')}
                       onCheckedChange={(checked) => {
-                        sustainabilityGoalsForm.setValue('other', checked as boolean);
+                        sustainabilityGoalsForm.setValue('other', checked === true);
                         if (!checked) {
                           sustainabilityGoalsForm.setValue('otherGoals', '');
                         }
@@ -522,7 +532,7 @@ export default function SignUpForm() {
                       id="termsAccepted"
                       checked={sustainabilityGoalsForm.watch('termsAccepted')}
                       onCheckedChange={(checked) => 
-                        sustainabilityGoalsForm.setValue('termsAccepted', checked as boolean)
+                        sustainabilityGoalsForm.setValue('termsAccepted', checked === true)
                       }
                     />
                     <div>
@@ -543,17 +553,23 @@ export default function SignUpForm() {
                 <Button type="button" variant="outline" onClick={() => setCurrentStep('companyDetails')}>
                   {t('common.back')}
                 </Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? 'Submitting...' : t('signup.joinWaitlist')}
+                <Button type="submit" disabled={submitting} className="bg-circa-green hover:bg-circa-green-dark">
+                  {submitting ? 'Submitting...' : t('signup.createAccount', 'Create Account')}
                 </Button>
               </div>
             </form>
           </TabsContent>
         </Tabs>
       </CardContent>
-      <CardFooter className="flex justify-center border-t pt-6">
-        <Button variant="ghost" asChild>
-          <a href="/auth/login">Already have an account? Log in</a>
+      <CardFooter className="flex flex-col sm:flex-row sm:justify-between items-center gap-4 mt-4">
+        <Button 
+          asChild
+          variant="link" 
+          className="text-sm"
+        >
+          <Link href="/auth/login">
+            {t('signup.alreadyHaveAccount', 'Already have an account?')} {t('common.login', 'Log in')}
+          </Link>
         </Button>
       </CardFooter>
     </Card>
