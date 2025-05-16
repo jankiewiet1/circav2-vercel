@@ -8,6 +8,7 @@ import { Pie } from 'react-chartjs-2';
 import emissionFactors from '@/data/emissionFactors.json';
 import { Chart, ArcElement, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import ReductionTips from './ReductionTips';
+import { sendCO2SummaryEmail } from '@/services/emailService';
 Chart.register(ArcElement, ChartTooltip, Legend);
 
 const SOCIAL_COST_PER_KG = 0.7;
@@ -91,24 +92,22 @@ export default function CO2Calculator() {
     e.preventDefault();
     setSubmitted(true);
 
-    await fetch('https://vfdbyvnjhimmnbyhxyun.functions.supabase.co/send-summary-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      await sendCO2SummaryEmail({
         email,
-        company: {
-          name: companyName,
-          address: companyAddress,
-          fte: fte
-        },
-        reduction: {
-          target: reductionTarget,
-          year: reductionYear,
-          targetEmissions: targetEmissions
-        },
-        summary: { inputs, totalCO2, totalCost, categoryResults }
-      }),
-    });
+        name: companyName || undefined, // Use company name as "name" if provided
+        company: companyName,
+        phone: '',
+        summary: {
+          totalCO2,
+          totalCost,
+          categoryResults
+        }
+      });
+    } catch (error) {
+      console.error('Error sending email:', error);
+      // Potentially show an error toast here
+    }
   };
 
   // Step content
