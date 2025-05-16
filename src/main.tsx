@@ -11,7 +11,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <HelmetProvider>
       <ThemeProvider>
-        <App />
+        <App Component={() => <div>Vite Development Mode</div>} pageProps={{}} />
         <Toaster />
       </ThemeProvider>
     </HelmetProvider>
