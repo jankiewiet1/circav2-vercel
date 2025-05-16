@@ -6,6 +6,13 @@
   "framework": "nextjs",
   "env": {
     "NEXT_PUBLIC_SUPABASE_URL": "@next_public_supabase_url",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@next_public_supabase_anon_key"
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@next_public_supabase_anon_key",
+    "VITE_CLIMATIQ_API_KEY": "@vite_climatiq_api_key"
+  },
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "new-main": false
+    }
   }
 } 
